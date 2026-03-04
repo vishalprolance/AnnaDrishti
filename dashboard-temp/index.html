@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anna Drishti - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #2d3748;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            color: #718096;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+        
+        .status {
+            background: #f7fafc;
+            border-left: 4px solid #48bb78;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .status h2 {
+            color: #2d3748;
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            color: #4a5568;
+        }
+        
+        .status-item::before {
+            content: "✓";
+            color: #48bb78;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+        
+        .api-test {
+            background: #edf2f7;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .api-test h3 {
+            color: #2d3748;
+            margin-bottom: 15px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            color: #4a5568;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #5a67d8;
+        }
+        
+        button:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+        
+        .result.success {
+            background: #c6f6d5;
+            border: 1px solid #48bb78;
+            color: #22543d;
+        }
+        
+        .result.error {
+            background: #fed7d7;
+            border: 1px solid #f56565;
+            color: #742a2a;
+        }
+        
+        .result pre {
+            margin-top: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+        }
+        
+        .info {
+            background: #bee3f8;
+            border-left: 4px solid #3182ce;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .info h3 {
+            color: #2c5282;
+            margin-bottom: 10px;
+        }
+        
+        .info p {
+            color: #2d3748;
+            line-height: 1.6;
+        }
+        
+        code {
+            background: #2d3748;
+            color: #68d391;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌾 Anna Drishti</h1>
+        <p class="subtitle">AI-Assisted Selling for Indian Farmers</p>
+        
+        <div class="status">
+            <h2>✅ Infrastructure Status</h2>
+            <div class="status-item">API Gateway deployed and running</div>
+            <div class="status-item">DynamoDB table created</div>
+            <div class="status-item">Lambda functions deployed</div>
+            <div class="status-item">CloudFront distribution active</div>
+        </div>
+        
+        <div class="api-test">
+            <h3>🧪 Test API - Start Workflow</h3>
+            <form id="testForm">
+                <div class="form-group">
+                    <label for="farmerName">Farmer Name</label>
+                    <input type="text" id="farmerName" value="Ramesh Patil" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="cropType">Crop Type</label>
+                    <input type="text" id="cropType" value="tomato" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="plotArea">Plot Area (acres)</label>
+                    <input type="number" id="plotArea" value="2.1" step="0.1" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="quantity">Estimated Quantity (kg)</label>
+                    <input type="number" id="quantity" value="2300" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="location">Location</label>
+                    <input type="text" id="location" value="Sinnar, Nashik" required>
+                </div>
+                
+                <button type="submit" id="submitBtn">Start Workflow</button>
+            </form>
+            
+            <div id="result" class="result"></div>
+        </div>
+        
+        <div class="info">
+            <h3>📋 Next Steps</h3>
+            <p>
+                This is a placeholder dashboard. The full React dashboard with real-time updates, 
+                negotiation chat, and processing visualizations is under development.
+            </p>
+            <p style="margin-top: 10px;">
+                <strong>API Endpoint:</strong> <code>POST /workflow/start</code>
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'https://35t4gu37d5.execute-api.ap-south-1.amazonaws.com/demo';
+        
+        document.getElementById('testForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const resultDiv = document.getElementById('result');
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+            resultDiv.style.display = 'none';
+            
+            const payload = {
+                farmer_name: document.getElementById('farmerName').value,
+                crop_type: document.getElementById('cropType').value,
+                plot_area: parseFloat(document.getElementById('plotArea').value),
+                estimated_quantity: parseFloat(document.getElementById('quantity').value),
+                location: document.getElementById('location').value
+            };
+            
+            try {
+                const response = await fetch(`${API_URL}/workflow/start`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                
+                resultDiv.className = 'result ' + (response.ok ? 'success' : 'error');
+                resultDiv.innerHTML = `
+                    <strong>${response.ok ? '✅ Success!' : '❌ Error'}</strong>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                resultDiv.style.display = 'block';
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <strong>❌ Network Error</strong>
+                    <pre>${error.message}</pre>
+                `;
+                resultDiv.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Start Workflow';
+            }
+        });
+    </script>
+</body>
+</html>
