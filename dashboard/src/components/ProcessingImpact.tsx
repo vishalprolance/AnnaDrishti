@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function ProcessingImpact() {
   const [scenario, setScenario] = useState<'without' | 'with'>('without');
@@ -63,7 +63,7 @@ export default function ProcessingImpact() {
               <XAxis dataKey="name" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} />
               <Tooltip
-                formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`}
+                formatter={(value: number | undefined) => value ? `₹${value.toLocaleString('en-IN')}` : '₹0'}
                 contentStyle={{ fontSize: 12 }}
               />
               <Bar
