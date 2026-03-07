@@ -1,6 +1,7 @@
 """
 Lambda function to scan market data from Agmarknet.
 Fetches prices for 4 mandis and calculates net-to-farmer prices.
+Enhanced with production-grade error handling, retries, and monitoring.
 """
 
 import json
@@ -9,11 +10,28 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 import boto3
+from botocore.exceptions import ClientError
+import time
 
 # Initialize AWS clients
 dynamodb = boto3.resource('dynamodb')
+cloudwatch = boto3.client('cloudwatch')
 table_name = os.environ.get('WORKFLOW_TABLE_NAME', 'anna-drishti-demo-workflows')
 table = dynamodb.Table(table_name)
+
+# Configuration
+MAX_RETRIES = 3
+RETRY_DELAY = 1  # seconds
+
+
+class MarketScanError(Exception):
+    """Custom exception for market scan errors."""
+    pass
+
+
+class ValidationError(MarketScanError):
+    """Exception for input validation errors."""
+    pass
 
 # Transport costs (₹/kg) based on distance
 TRANSPORT_COSTS = {
@@ -44,6 +62,41 @@ MOCK_PRICES = {
         'Mumbai': {'price': 52.0, 'arrivals': 35.0},
     },
 }
+
+
+def publish_metric(metric_name: str, value: float = 1.0, unit: str = 'Count'):
+    """Publish custom metric to CloudWatch."""
+    try:
+        cloudwatch.put_metric_data(
+            Namespace='AnnaDrishti/MarketScan',
+            MetricData=[
+                {
+                    'MetricName': metric_name,
+                    'Value': value,
+                    'Unit': unit,
+                    'Timestamp': datetime.utcnow()
+                }
+            ]
+        )
+    except Exception as e:
+        print(f"Failed to publish metric {metric_name}: {str(e)}")
+
+
+def validate_input(body: dict) -> dict:
+    """Validate market scan input data."""
+    errors = []
+    
+    if not body.get('workflow_id'):
+        errors.append('workflow_id is required')
+    
+    crop_type = body.get('crop_type', '').lower()
+    if crop_type and crop_type not in MOCK_PRICES:
+        errors.append(f'crop_type must be one of: {", ".join(MOCK_PRICES.keys())}')
+    
+    if errors:
+        raise ValidationError('; '.join(errors))
+    
+    return body
 
 
 def fetch_agmarknet_prices(crop_type: str) -> tuple[list[dict], str]:
@@ -79,12 +132,51 @@ def fetch_agmarknet_prices(crop_type: str) -> tuple[list[dict], str]:
                 'arrivals_tonnes': Decimal(str(data['arrivals'])),
             })
         
+        publish_metric('MarketDataFetched')
         return mandis_data, 'live'
         
     except Exception as e:
         print(f"Error fetching Agmarknet data: {str(e)}")
-        # Return cached/mock data as fallback
-        return [], 'cached'
+        publish_metric('MarketDataFetchFailed')
+        raise MarketScanError(f"Failed to fetch market data: {str(e)}")
+
+
+def update_workflow_with_retry(workflow_id: str, market_scan: dict) -> None:
+    """Update workflow in DynamoDB with exponential backoff retry."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            table.update_item(
+                Key={'workflow_id': workflow_id},
+                UpdateExpression='SET market_scan = :scan, #status = :status, updated_at = :updated',
+                ExpressionAttributeNames={
+                    '#status': 'status',
+                },
+                ExpressionAttributeValues={
+                    ':scan': market_scan,
+                    ':status': 'scanning_market',
+                    ':updated': datetime.utcnow().isoformat() + 'Z',
+                }
+            )
+            publish_metric('MarketScanCompleted')
+            return
+        except ClientError as e:
+            error_code = e.response['Error']['Code']
+            
+            if error_code == 'ProvisionedThroughputExceededException':
+                if attempt < MAX_RETRIES - 1:
+                    delay = RETRY_DELAY * (2 ** attempt)
+                    print(f"Throughput exceeded, retrying in {delay}s (attempt {attempt + 1}/{MAX_RETRIES})")
+                    time.sleep(delay)
+                    continue
+                else:
+                    publish_metric('MarketScanFailed')
+                    raise MarketScanError(f"DynamoDB throughput exceeded after {MAX_RETRIES} retries")
+            else:
+                publish_metric('MarketScanFailed')
+                raise MarketScanError(f"DynamoDB error: {error_code} - {str(e)}")
+        except Exception as e:
+            publish_metric('MarketScanFailed')
+            raise MarketScanError(f"Unexpected error updating workflow: {str(e)}")
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -97,6 +189,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         "crop_type": "tomato"
     }
     """
+    start_time = time.time()
+    
     try:
         # Parse input
         if isinstance(event.get('body'), str):
@@ -104,23 +198,17 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         else:
             body = event.get('body', event)
         
-        workflow_id = body.get('workflow_id')
-        crop_type = body.get('crop_type', 'tomato')
+        # Validate input
+        validate_input(body)
         
-        if not workflow_id:
-            return {
-                'statusCode': 400,
-                'body': json.dumps({'error': 'workflow_id is required'})
-            }
+        workflow_id = body.get('workflow_id')
+        crop_type = body.get('crop_type', 'tomato').lower()
         
         # Fetch market data
         mandis_data, data_source = fetch_agmarknet_prices(crop_type)
         
         if not mandis_data:
-            return {
-                'statusCode': 500,
-                'body': json.dumps({'error': 'Failed to fetch market data'})
-            }
+            raise MarketScanError('No market data available')
         
         # Find recommended mandi (highest net price)
         recommended = max(mandis_data, key=lambda m: m['net_price'])
@@ -133,19 +221,12 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             'timestamp': datetime.utcnow().isoformat() + 'Z',
         }
         
-        # Update workflow in DynamoDB
-        table.update_item(
-            Key={'workflow_id': workflow_id},
-            UpdateExpression='SET market_scan = :scan, #status = :status, updated_at = :updated',
-            ExpressionAttributeNames={
-                '#status': 'status',
-            },
-            ExpressionAttributeValues={
-                ':scan': market_scan,
-                ':status': 'scanning_market',
-                ':updated': datetime.utcnow().isoformat() + 'Z',
-            }
-        )
+        # Update workflow in DynamoDB with retry logic
+        update_workflow_with_retry(workflow_id, market_scan)
+        
+        # Publish latency metric
+        latency = (time.time() - start_time) * 1000
+        publish_metric('MarketScanLatency', latency, 'Milliseconds')
         
         # Return success response
         return {
@@ -172,8 +253,26 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             })
         }
         
-    except Exception as e:
-        print(f"Error scanning market: {str(e)}")
+    except ValidationError as e:
+        publish_metric('ValidationError')
+        print(f"Validation error: {str(e)}")
+        return {
+            'statusCode': 400,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+            },
+            'body': json.dumps({
+                'success': False,
+                'error': 'Validation failed',
+                'details': str(e),
+                'message': 'Invalid input data',
+            })
+        }
+    
+    except MarketScanError as e:
+        publish_metric('MarketScanError')
+        print(f"Market scan error: {str(e)}")
         return {
             'statusCode': 500,
             'headers': {
@@ -182,7 +281,27 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             },
             'body': json.dumps({
                 'success': False,
-                'error': str(e),
+                'error': 'Market scan error',
+                'details': str(e),
                 'message': 'Failed to scan market',
+            })
+        }
+    
+    except Exception as e:
+        publish_metric('UnexpectedError')
+        print(f"Unexpected error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+            },
+            'body': json.dumps({
+                'success': False,
+                'error': 'Internal server error',
+                'message': 'An unexpected error occurred',
             })
         }

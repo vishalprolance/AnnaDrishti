@@ -77,6 +77,24 @@ export class DemoStack extends cdk.Stack {
       resources: ['*'], // Bedrock models don't have specific ARNs
     }));
 
+    // Grant SNS permissions for SMS
+    lambdaRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'sns:Publish',
+      ],
+      resources: ['*'], // SNS SMS doesn't require specific topic ARN
+    }));
+
+    // Grant CloudWatch metrics permissions
+    lambdaRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'cloudwatch:PutMetricData',
+      ],
+      resources: ['*'],
+    }));
+
     // Lambda Functions
     
     // Start Workflow Lambda
@@ -137,7 +155,7 @@ export class DemoStack extends cdk.Stack {
       }),
     });
 
-    // Negotiate Lambda (Bedrock)
+    // Negotiate Lambda (OpenAI)
     const negotiateFn = new lambda.Function(this, 'NegotiateFunction', {
       functionName: 'anna-drishti-negotiate',
       runtime: lambda.Runtime.PYTHON_3_11,
@@ -145,13 +163,135 @@ export class DemoStack extends cdk.Stack {
       code: lambda.Code.fromAsset('../backend/lambdas'),
       layers: [sharedLayer],
       role: lambdaRole,
-      timeout: cdk.Duration.seconds(60), // Longer timeout for Bedrock
+      timeout: cdk.Duration.seconds(60), // Longer timeout for AI API
       environment: {
         WORKFLOW_TABLE_NAME: workflowTable.tableName,
-        BEDROCK_MODEL_ID: 'anthropic.claude-3-haiku-20240307-v1:0',
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+        OPENAI_MODEL: 'gpt-4o-mini',
       },
       logGroup: new logs.LogGroup(this, 'NegotiateLogGroup', {
         logGroupName: '/aws/lambda/anna-drishti-negotiate',
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+
+    // IVR Handler Lambda (for Lex bot)
+    const ivrHandlerFn = new lambda.Function(this, 'IVRHandlerFunction', {
+      functionName: 'anna-drishti-ivr-handler',
+      runtime: lambda.Runtime.PYTHON_3_11,
+      handler: 'ivr_handler.lambda_handler',
+      code: lambda.Code.fromAsset('../backend/lambdas'),
+      layers: [sharedLayer],
+      role: lambdaRole,
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        WORKFLOW_TABLE_NAME: workflowTable.tableName,
+        DASHBOARD_URL: 'https://d2ll18l06rc220.cloudfront.net',
+      },
+      logGroup: new logs.LogGroup(this, 'IVRHandlerLogGroup', {
+        logGroupName: '/aws/lambda/anna-drishti-ivr-handler',
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+
+    // Grant Lex permissions to invoke IVR handler
+    ivrHandlerFn.addPermission('LexInvokePermission', {
+      principal: new iam.ServicePrincipal('lexv2.amazonaws.com'),
+      action: 'lambda:InvokeFunction',
+    });
+
+    // List Farmers Lambda (for farmer portfolio)
+    const listFarmersFn = new lambda.Function(this, 'ListFarmersFunction', {
+      functionName: 'anna-drishti-list-farmers',
+      runtime: lambda.Runtime.PYTHON_3_11,
+      handler: 'list_farmers.lambda_handler',
+      code: lambda.Code.fromAsset('../backend/lambdas'),
+      layers: [sharedLayer],
+      role: lambdaRole,
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        WORKFLOW_TABLE_NAME: workflowTable.tableName,
+      },
+      logGroup: new logs.LogGroup(this, 'ListFarmersLogGroup', {
+        logGroupName: '/aws/lambda/anna-drishti-list-farmers',
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+
+    // Get Farmer Lambda (for farmer detail page)
+    const getFarmerFn = new lambda.Function(this, 'GetFarmerFunction', {
+      functionName: 'anna-drishti-get-farmer',
+      runtime: lambda.Runtime.PYTHON_3_11,
+      handler: 'get_farmer.lambda_handler',
+      code: lambda.Code.fromAsset('../backend/lambdas'),
+      layers: [sharedLayer],
+      role: lambdaRole,
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        WORKFLOW_TABLE_NAME: workflowTable.tableName,
+      },
+      logGroup: new logs.LogGroup(this, 'GetFarmerLogGroup', {
+        logGroupName: '/aws/lambda/anna-drishti-get-farmer',
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+
+    // Update Payment Lambda (for payment tracking)
+    const updatePaymentFn = new lambda.Function(this, 'UpdatePaymentFunction', {
+      functionName: 'anna-drishti-update-payment',
+      runtime: lambda.Runtime.PYTHON_3_11,
+      handler: 'update_payment.lambda_handler',
+      code: lambda.Code.fromAsset('../backend/lambdas'),
+      layers: [sharedLayer],
+      role: lambdaRole,
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        WORKFLOW_TABLE_NAME: workflowTable.tableName,
+      },
+      logGroup: new logs.LogGroup(this, 'UpdatePaymentLogGroup', {
+        logGroupName: '/aws/lambda/anna-drishti-update-payment',
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+
+    // Get Payment Metrics Lambda (for payment dashboard)
+    const getPaymentMetricsFn = new lambda.Function(this, 'GetPaymentMetricsFunction', {
+      functionName: 'anna-drishti-get-payment-metrics',
+      runtime: lambda.Runtime.PYTHON_3_11,
+      handler: 'get_payment_metrics.lambda_handler',
+      code: lambda.Code.fromAsset('../backend/lambdas'),
+      layers: [sharedLayer],
+      role: lambdaRole,
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        WORKFLOW_TABLE_NAME: workflowTable.tableName,
+      },
+      logGroup: new logs.LogGroup(this, 'GetPaymentMetricsLogGroup', {
+        logGroupName: '/aws/lambda/anna-drishti-get-payment-metrics',
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+
+    // Get Satellite Data Lambda (for crop health monitoring)
+    const getSatelliteDataFn = new lambda.Function(this, 'GetSatelliteDataFunction', {
+      functionName: 'anna-drishti-get-satellite-data',
+      runtime: lambda.Runtime.PYTHON_3_11,
+      handler: 'get_satellite_data.lambda_handler',
+      code: lambda.Code.fromAsset('../backend/lambdas'),
+      layers: [sharedLayer],
+      role: lambdaRole,
+      timeout: cdk.Duration.seconds(60), // Longer timeout for satellite data processing
+      environment: {
+        WORKFLOW_TABLE_NAME: workflowTable.tableName,
+      },
+      logGroup: new logs.LogGroup(this, 'GetSatelliteDataLogGroup', {
+        logGroupName: '/aws/lambda/anna-drishti-get-satellite-data',
         retention: logs.RetentionDays.ONE_WEEK,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       }),
@@ -193,6 +333,33 @@ export class DemoStack extends cdk.Stack {
     // POST /workflow/negotiate
     negotiateResource.addMethod('POST', new apigateway.LambdaIntegration(negotiateFn));
 
+    // Farmer Portfolio API Resources
+    const farmersResource = api.root.addResource('farmers');
+    const farmerResource = farmersResource.addResource('{farmer_name}');
+    
+    // GET /farmers (list all farmers)
+    farmersResource.addMethod('GET', new apigateway.LambdaIntegration(listFarmersFn));
+    
+    // GET /farmers/{farmer_name} (get specific farmer details)
+    farmerResource.addMethod('GET', new apigateway.LambdaIntegration(getFarmerFn));
+
+    // Payment Tracking API Resources
+    const paymentsResource = api.root.addResource('payments');
+    const updatePaymentResource = paymentsResource.addResource('update');
+    const metricsResource = paymentsResource.addResource('metrics');
+    
+    // POST /payments/update (update payment status)
+    updatePaymentResource.addMethod('POST', new apigateway.LambdaIntegration(updatePaymentFn));
+    
+    // GET /payments/metrics (get payment metrics)
+    metricsResource.addMethod('GET', new apigateway.LambdaIntegration(getPaymentMetricsFn));
+
+    // Satellite Data API Resources
+    const satelliteResource = api.root.addResource('satellite');
+    
+    // POST /satellite (get satellite data for workflow)
+    satelliteResource.addMethod('POST', new apigateway.LambdaIntegration(getSatelliteDataFn));
+
     // WebSocket API (placeholder for Phase 1)
     // Will be implemented in Hour 33-40
     this.wsUrl = 'wss://placeholder-websocket-url';
@@ -223,6 +390,12 @@ export class DemoStack extends cdk.Stack {
       value: sharedLayer.layerVersionArn,
       description: 'Lambda layer with shared code',
       exportName: 'AnnaDrishtiSharedLayer',
+    });
+
+    new cdk.CfnOutput(this, 'IVRHandlerArn', {
+      value: ivrHandlerFn.functionArn,
+      description: 'IVR Handler Lambda ARN (for Lex bot)',
+      exportName: 'AnnaDrishtiIVRHandler',
     });
   }
 }

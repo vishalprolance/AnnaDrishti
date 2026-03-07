@@ -1,4 +1,5 @@
 export const API_URL = import.meta.env.VITE_API_URL || 'https://35t4gu37d5.execute-api.ap-south-1.amazonaws.com/demo';
+export const API_BASE_URL = API_URL; // Alias for consistency
 
 export const DEMO_DATA = {
   farmerInput: {
