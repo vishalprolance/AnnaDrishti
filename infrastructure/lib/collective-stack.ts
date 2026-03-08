@@ -293,6 +293,7 @@ export class CollectiveStack extends cdk.Stack {
       role: lambdaRole,
       timeout: cdk.Duration.seconds(30),
       memorySize: 512,
+      architecture: lambda.Architecture.X86_64,
       environment: commonEnv,
       vpc: vpc,
       vpcSubnets: vpc ? { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS } : undefined,
