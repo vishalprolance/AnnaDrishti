@@ -355,7 +355,10 @@ export class CollectiveStack extends cdk.Stack {
       proxy: true,
     });
 
-    // Add proxy resource to handle all paths (includes root)
+    // Add root endpoint explicitly
+    api.root.addMethod('ANY', apiIntegration);
+
+    // Add proxy resource to handle all other paths
     const proxyResource = api.root.addProxy({
       defaultIntegration: apiIntegration,
       anyMethod: true,
