@@ -30,6 +30,7 @@ app = FastAPI(
     title="Anna Drishti Collective Selling API",
     description="API for collective selling and allocation system",
     version="1.0.0",
+    root_path="/demo",  # API Gateway stage path
 )
 
 # Configure CORS
