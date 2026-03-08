@@ -104,14 +104,18 @@ class AuditLogger:
             log_to_cloudwatch: If True, send logs to CloudWatch.
                               If False, log to local file (for development).
         """
-        self.log_to_cloudwatch = log_to_cloudwatch
+        import os
+        
+        # Auto-detect Lambda environment
+        is_lambda = os.environ.get('AWS_LAMBDA_FUNCTION_NAME') is not None
+        self.log_to_cloudwatch = log_to_cloudwatch or is_lambda
         
         # Set up Python logger
         self.logger = logging.getLogger("collective.audit")
         self.logger.setLevel(logging.INFO)
         
-        # Add file handler for local logging
-        if not log_to_cloudwatch:
+        # Add file handler for local logging (not in Lambda)
+        if not self.log_to_cloudwatch:
             handler = logging.FileHandler("audit.log")
             handler.setLevel(logging.INFO)
             formatter = logging.Formatter(
@@ -119,12 +123,15 @@ class AuditLogger:
             )
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
-        
-        # TODO: Add CloudWatch handler for production
-        # if log_to_cloudwatch:
-        #     import watchtower
-        #     handler = watchtower.CloudWatchLogHandler()
-        #     self.logger.addHandler(handler)
+        else:
+            # In Lambda/CloudWatch, use StreamHandler (logs go to CloudWatch automatically)
+            handler = logging.StreamHandler()
+            handler.setLevel(logging.INFO)
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
     
     def log_event(self, event: AuditEvent) -> None:
         """

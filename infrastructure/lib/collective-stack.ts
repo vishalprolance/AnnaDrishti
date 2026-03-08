@@ -221,15 +221,17 @@ export class CollectiveStack extends cdk.Stack {
       code: lambda.Code.fromAsset('../backend', {
         bundling: {
           image: lambda.Runtime.PYTHON_3_11.bundlingImage,
+          platform: 'linux/amd64',
           command: [
             'bash', '-c',
-            'pip install -r requirements.txt -t /asset-output/python && ' +
+            'pip install -r requirements.txt -t /asset-output/python --platform manylinux2014_x86_64 --only-binary=:all: && ' +
             'cp -r collective /asset-output/python/ && ' +
             'cp -r models /asset-output/python/'
           ],
         },
       }),
       compatibleRuntimes: [lambda.Runtime.PYTHON_3_11],
+      compatibleArchitectures: [lambda.Architecture.X86_64],
       description: 'Collective selling system dependencies and code',
     });
 
