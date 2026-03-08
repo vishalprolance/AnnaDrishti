@@ -29,13 +29,27 @@ class DatabaseConfig:
     @staticmethod
     def get_postgres_config() -> Dict[str, str]:
         """Get PostgreSQL configuration from environment"""
-        return {
+        config = {
             "host": os.getenv("POSTGRES_HOST", "localhost"),
             "port": os.getenv("POSTGRES_PORT", "5432"),
             "database": os.getenv("POSTGRES_DB", "anna_drishti"),
             "user": os.getenv("POSTGRES_USER", "postgres"),
             "password": os.getenv("POSTGRES_PASSWORD", ""),
         }
+        
+        # If running in Lambda with Secrets Manager, get password from secret
+        secret_arn = os.getenv("DB_SECRET_ARN")
+        if secret_arn and not config["password"]:
+            try:
+                import boto3
+                secrets_client = boto3.client('secretsmanager')
+                secret_value = secrets_client.get_secret_value(SecretId=secret_arn)
+                secret_data = json.loads(secret_value['SecretString'])
+                config["password"] = secret_data.get('password', '')
+            except Exception as e:
+                print(f"Warning: Could not retrieve database password from Secrets Manager: {e}")
+        
+        return config
     
     @staticmethod
     def get_dynamodb_config() -> Dict[str, str]:

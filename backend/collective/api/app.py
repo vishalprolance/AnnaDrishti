@@ -10,10 +10,10 @@ from fastapi.responses import JSONResponse
 from typing import Callable
 
 from .inventory import router as inventory_router
-# from .society import router as society_router  # Requires PostgreSQL
-# from .demand import router as demand_router  # Requires PostgreSQL
-# from .processing import router as processing_router  # Requires PostgreSQL
-# from .allocation import router as allocation_router  # Requires PostgreSQL
+from .society import router as society_router
+from .demand import router as demand_router
+from .processing import router as processing_router
+from .allocation import router as allocation_router
 from .legacy import router as legacy_router
 
 
@@ -139,10 +139,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 # Include routers
 app.include_router(inventory_router)
-# app.include_router(society_router)  # Requires PostgreSQL
-# app.include_router(demand_router)  # Requires PostgreSQL
-# app.include_router(processing_router)  # Requires PostgreSQL
-# app.include_router(allocation_router)  # Requires PostgreSQL
+app.include_router(society_router)
+app.include_router(demand_router)
+app.include_router(processing_router)
+app.include_router(allocation_router)
 app.include_router(legacy_router)
 
 

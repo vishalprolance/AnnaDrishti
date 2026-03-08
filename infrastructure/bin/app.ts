@@ -39,7 +39,7 @@ const collectiveStack = new CollectiveStack(app, 'AnnaDrishtiCollectiveStack', {
     Phase: 'Collective-Selling',
   },
   environment: environment,
-  enableRds: false, // Set to true to enable PostgreSQL RDS
+  enableRds: true, // Enable PostgreSQL RDS for full functionality
 });
 
 // Monitoring Stack - CloudWatch dashboards and alarms

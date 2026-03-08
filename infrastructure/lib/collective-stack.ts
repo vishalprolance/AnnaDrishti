@@ -137,7 +137,9 @@ export class CollectiveStack extends cdk.Stack {
 
     let dbSecret: secretsmanager.ISecret | undefined;
     let dbSecurityGroup: ec2.ISecurityGroup | undefined;
+    let lambdaSecurityGroup: ec2.ISecurityGroup | undefined;
     let vpc: ec2.IVpc | undefined;
+    let dbInstance: rds.DatabaseInstance | undefined;
 
     if (enableRds) {
       // Create VPC for RDS
@@ -169,6 +171,20 @@ export class CollectiveStack extends cdk.Stack {
         description: 'Security group for PostgreSQL RDS',
         allowAllOutbound: true,
       });
+      
+      // Security group for Lambda
+      lambdaSecurityGroup = new ec2.SecurityGroup(this, 'LambdaSecurityGroup', {
+        vpc,
+        description: 'Security group for Lambda functions',
+        allowAllOutbound: true,
+      });
+      
+      // Allow Lambda to connect to RDS
+      dbSecurityGroup.addIngressRule(
+        lambdaSecurityGroup,
+        ec2.Port.tcp(5432),
+        'Allow Lambda to connect to PostgreSQL'
+      );
 
       // Create database credentials secret
       dbSecret = new secretsmanager.Secret(this, 'DbSecret', {
@@ -182,9 +198,9 @@ export class CollectiveStack extends cdk.Stack {
       });
 
       // Create PostgreSQL RDS instance
-      const dbInstance = new rds.DatabaseInstance(this, 'CollectiveDatabase', {
+      dbInstance = new rds.DatabaseInstance(this, 'CollectiveDatabase', {
         engine: rds.DatabaseInstanceEngine.postgres({
-          version: rds.PostgresEngineVersion.VER_15_4,
+          version: rds.PostgresEngineVersion.VER_16,
         }),
         instanceType: ec2.InstanceType.of(
           ec2.InstanceClass.T3,
@@ -281,8 +297,12 @@ export class CollectiveStack extends cdk.Stack {
       FEATURE_FLAG_COLLECTIVE_MODE: 'true',
     };
 
-    if (dbSecret) {
+    if (dbSecret && dbInstance) {
       commonEnv.DB_SECRET_ARN = dbSecret.secretArn;
+      commonEnv.POSTGRES_HOST = dbInstance.dbInstanceEndpointAddress;
+      commonEnv.POSTGRES_PORT = '5432';
+      commonEnv.POSTGRES_DB = 'collective_selling';
+      commonEnv.POSTGRES_USER = 'collective_admin';
     }
 
     // Main API Lambda (FastAPI application)
@@ -299,7 +319,7 @@ export class CollectiveStack extends cdk.Stack {
       environment: commonEnv,
       vpc: vpc,
       vpcSubnets: vpc ? { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS } : undefined,
-      securityGroups: dbSecurityGroup ? [dbSecurityGroup] : undefined,
+      securityGroups: lambdaSecurityGroup ? [lambdaSecurityGroup] : undefined,
       logGroup: new logs.LogGroup(this, 'ApiLogGroup', {
         logGroupName: `/aws/lambda/collective-api-${environment}`,
         retention: environment === 'prod' ? logs.RetentionDays.ONE_MONTH : logs.RetentionDays.ONE_WEEK,
