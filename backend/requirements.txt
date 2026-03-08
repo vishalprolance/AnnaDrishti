@@ -15,9 +15,19 @@ pytz==2024.1
 pytest==8.0.2
 pytest-cov==4.1.0
 moto==5.0.2
+hypothesis==6.98.0
 
 # Type Hints
 typing-extensions==4.9.0
+
+# Database
+psycopg2-binary==2.9.9
+
+# API Framework
+fastapi==0.109.2
+uvicorn==0.27.1
+pydantic==2.6.1
+mangum==0.17.0
 
 # Utilities
 python-dotenv==1.0.1

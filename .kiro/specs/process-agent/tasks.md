@@ -548,7 +548,7 @@ The implementation follows a layered approach: data models → core components �
     - Test fallback to cached data
     - _Requirements: 16.1, 16.4_
   
-  - [ ]* 23.5 Write end-to-end test for complete workflow
+  - [ ] 23.5 Write end-to-end test for complete workflow
     - Test full flow: surplus detection → optimization → processor communication → confirmation → contract creation
     - _Requirements: All requirements_
 

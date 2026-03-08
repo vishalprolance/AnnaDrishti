@@ -1,0 +1,21 @@
+{
+  "environment": "prod",
+  "region": "ap-south-1",
+  "enableRds": true,
+  "enablePointInTimeRecovery": true,
+  "enableDeletionProtection": true,
+  "lambdaMemorySize": 1024,
+  "lambdaTimeout": 60,
+  "apiThrottleBurstLimit": 500,
+  "apiThrottleRateLimit": 200,
+  "cloudwatchRetentionDays": 30,
+  "featureFlags": {
+    "collectiveMode": true,
+    "detailedMonitoring": true
+  },
+  "alarmThresholds": {
+    "api5xxErrors": 5,
+    "lambdaErrors": 3,
+    "lambdaDurationMs": 3000
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "environment": "staging",
+  "region": "ap-south-1",
+  "enableRds": false,
+  "enablePointInTimeRecovery": false,
+  "enableDeletionProtection": false,
+  "lambdaMemorySize": 512,
+  "lambdaTimeout": 30,
+  "apiThrottleBurstLimit": 100,
+  "apiThrottleRateLimit": 50,
+  "cloudwatchRetentionDays": 7,
+  "featureFlags": {
+    "collectiveMode": true,
+    "detailedMonitoring": true
+  },
+  "alarmThresholds": {
+    "api5xxErrors": 10,
+    "lambdaErrors": 5,
+    "lambdaDurationMs": 5000
+  }
+}
